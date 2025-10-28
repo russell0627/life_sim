@@ -4,10 +4,11 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../controller/game_controller.dart';
-import '../model/cell.dart';
 import '../model/plant.dart';
 import '../model/animal.dart';
+import '../model/terrain.dart';
 import 'stats_overlay.dart';
+import 'map_key_overlay.dart'; // Import the new map key overlay
 
 class GameScreen extends ConsumerWidget {
   const GameScreen({super.key});
@@ -53,11 +54,18 @@ class GameScreen extends ConsumerWidget {
 
                   Color cellColor;
                   switch (cell.terrain) {
-                    case Terrain.ground:
-                      cellColor = Colors.brown[200]!;
-                      break;
-                    case Terrain.water:
+                    case TerrainType.water:
                       cellColor = Colors.blue[200]!;
+                      break;
+                    case TerrainType.grassland:
+                      // Vary shade based on elevation
+                      cellColor = Colors.lightGreen[100 + cell.elevation * 100]!;
+                      break;
+                    case TerrainType.forest:
+                      cellColor = Colors.green[100 + cell.elevation * 100]!;
+                      break;
+                    case TerrainType.mountain:
+                      cellColor = Colors.grey[400 + cell.elevation * 100]!;
                       break;
                   }
 
@@ -95,22 +103,26 @@ class GameScreen extends ConsumerWidget {
                     );
                   } else if (plantAtPosition != null) {
                     Color plantColor;
+                    double plantSizeFactor = 0.6; // Default size factor
+
                     switch (plantAtPosition.type) {
                       case PlantType.grass:
                         plantColor = Colors.lightGreen;
+                        // Scale grass size based on its 'size' attribute (e.g., max size 10.0)
+                        plantSizeFactor = min(1.0, plantAtPosition.size / 10.0); 
                         break;
                       case PlantType.berryBush:
                         plantColor = Colors.green[800]!;
                         break;
                     }
                     childWidget = Container(
-                      width: cellSize * 0.6, // Scale plant size with cell size
-                      height: cellSize * 0.6, // Scale plant size with cell size
+                      width: cellSize * plantSizeFactor, // Use scaled plant size
+                      height: cellSize * plantSizeFactor, // Use scaled plant size
                       decoration: BoxDecoration(
                         color: plantColor,
                         shape: BoxShape.circle,
                       ),
-                      child: plantAtPosition.type == PlantType.berryBush
+                      child: plantAtPosition.type == PlantType.berryBush && !plantAtPosition.isEmpty
                           ? Center(
                               child: Container(
                                 width: cellSize * 0.2,
@@ -121,7 +133,7 @@ class GameScreen extends ConsumerWidget {
                                 ),
                               ),
                             )
-                          : null,
+                          : null, // Don't show berries if empty
                     );
                   }
 
@@ -139,6 +151,7 @@ class GameScreen extends ConsumerWidget {
             ),
           ),
           const StatsOverlay(),
+          const MapKeyOverlay(),
         ],
       ),
     );

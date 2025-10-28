@@ -10,6 +10,7 @@ class Pathfinding {
     Grid grid,
     Point<int> start,
     bool Function(Cell, Point<int>) isGoal,
+    [bool Function(Cell, Point<int>)? isObstacle] // Added optional obstacle predicate
   ) {
     final queue = Queue<List<Point<int>>>();
     final visited = <Point<int>>{};
@@ -36,7 +37,18 @@ class Pathfinding {
               neighbor.y >= 0 &&
               neighbor.y < grid.height &&
               !visited.contains(neighbor)) {
-            neighbors.add(neighbor);
+            final neighborCell = grid.getCell(neighbor);
+            final currentCell = grid.getCell(current);
+
+            // Check for elevation difference obstacle
+            if ((neighborCell.elevation - currentCell.elevation).abs() > 1) {
+              continue; // Cannot move if elevation change is too steep
+            }
+
+            // Check if the neighbor is an obstacle based on the provided predicate
+            if (isObstacle == null || !isObstacle(neighborCell, neighbor)) {
+              neighbors.add(neighbor);
+            }
           }
         }
       }

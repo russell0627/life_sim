@@ -15,6 +15,8 @@ class Plant extends Entity {
     required this.type,
     this.size = 1.0,
     this.nutritionalValue = 10.0,
+    this.isEmpty = false,
+    this.regrowthTimer = 0,
   }) {
     // Set initial stats based on plant type
     switch (type) {
@@ -32,18 +34,24 @@ class Plant extends Entity {
   final PlantType type;
   double size;
   double nutritionalValue;
+  bool isEmpty; // For berry bushes, true if eaten and regrowing
+  int regrowthTimer; // For berry bushes, how many ticks until it's no longer empty
 
   Plant copyWith({
     Point<int>? position,
     double? size,
     double? nutritionalValue,
     PlantType? type,
+    bool? isEmpty,
+    int? regrowthTimer,
   }) {
     return Plant(
       position: position ?? this.position,
       type: type ?? this.type,
       size: size ?? this.size,
       nutritionalValue: nutritionalValue ?? this.nutritionalValue,
+      isEmpty: isEmpty ?? this.isEmpty,
+      regrowthTimer: regrowthTimer ?? this.regrowthTimer,
     );
   }
 }

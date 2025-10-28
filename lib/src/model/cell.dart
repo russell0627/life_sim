@@ -1,21 +1,23 @@
 
 import 'entity.dart';
-
-enum Terrain { ground, water }
+import 'terrain.dart'; // Import from new terrain.dart
 
 class Cell {
-  Cell({required this.terrain, this.entities = const []});
+  Cell({required this.terrain, this.entities = const [], this.elevation = 0});
 
-  final Terrain terrain;
+  final TerrainType terrain;
   final List<Entity> entities;
+  final int elevation;
 
   Cell copyWith({
-    Terrain? terrain,
+    TerrainType? terrain,
     List<Entity>? entities,
+    int? elevation,
   }) {
     return Cell(
       terrain: terrain ?? this.terrain,
       entities: entities ?? this.entities,
+      elevation: elevation ?? this.elevation,
     );
   }
 }

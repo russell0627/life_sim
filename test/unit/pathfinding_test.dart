@@ -2,9 +2,9 @@
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:life_sim/src/model/cell.dart';
 import 'package:life_sim/src/model/grid.dart';
 import 'package:life_sim/src/utils/pathfinding.dart';
+import 'package:life_sim/src/model/terrain.dart'; // Import TerrainType
 
 void main() {
   group('Pathfinding', () {
@@ -30,9 +30,9 @@ void main() {
     test('should return null if no path is found due to obstacles', () {
       // Create a grid with an obstacle blocking the path
       Grid grid = Grid(width: 3, height: 3);
-      grid = grid.setCell(Point(1, 0), grid.getCell(Point(1, 0)).copyWith(terrain: Terrain.water));
-      grid = grid.setCell(Point(1, 1), grid.getCell(Point(1, 1)).copyWith(terrain: Terrain.water));
-      grid = grid.setCell(Point(1, 2), grid.getCell(Point(1, 2)).copyWith(terrain: Terrain.water));
+      grid = grid.setCell(Point(1, 0), grid.getCell(Point(1, 0)).copyWith(terrain: TerrainType.water)); // Use TerrainType
+      grid = grid.setCell(Point(1, 1), grid.getCell(Point(1, 1)).copyWith(terrain: TerrainType.water)); // Use TerrainType
+      grid = grid.setCell(Point(1, 2), grid.getCell(Point(1, 2)).copyWith(terrain: TerrainType.water)); // Use TerrainType
 
       final start = Point(0, 1);
       final end = Point(2, 1);
@@ -48,7 +48,7 @@ void main() {
 
     test('should find a path around an obstacle', () {
       Grid grid = Grid(width: 3, height: 3);
-      grid = grid.setCell(Point(1, 1), grid.getCell(Point(1, 1)).copyWith(terrain: Terrain.water));
+      grid = grid.setCell(Point(1, 1), grid.getCell(Point(1, 1)).copyWith(terrain: TerrainType.water)); // Use TerrainType
 
       final start = Point(0, 0);
       final end = Point(2, 2);
@@ -68,19 +68,19 @@ void main() {
 
     test('should find path to water terrain', () {
       Grid grid = Grid(width: 3, height: 3);
-      grid = grid.setCell(Point(2, 2), grid.getCell(Point(2, 2)).copyWith(terrain: Terrain.water));
+      grid = grid.setCell(Point(2, 2), grid.getCell(Point(2, 2)).copyWith(terrain: TerrainType.water)); // Use TerrainType
 
       final start = Point(0, 0);
 
       final path = Pathfinding.findPath(
         grid,
         start,
-        (cell, pos) => cell.terrain == Terrain.water,
+        (cell, pos) => cell.terrain == TerrainType.water, // Use TerrainType
       );
 
       expect(path, isNotNull);
       expect(path!.first, start);
-      expect(grid.getCell(path.last).terrain, Terrain.water);
+      expect(grid.getCell(path.last).terrain, TerrainType.water);
     });
   });
 }

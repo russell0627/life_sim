@@ -2,13 +2,14 @@
 import 'dart:math';
 
 import 'cell.dart';
+import 'terrain.dart'; // Import TerrainType
 
 class Grid {
   Grid({required this.width, required this.height, List<List<Cell>>? cells}) {
     _cells = cells ??
         List.generate(
           width,
-          (_) => List.generate(height, (_) => Cell(terrain: Terrain.ground)),
+          (_) => List.generate(height, (_) => Cell(terrain: TerrainType.grassland)), // Use TerrainType.grassland
         );
   }
 
