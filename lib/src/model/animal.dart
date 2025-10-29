@@ -32,41 +32,8 @@ class Animal extends Entity {
     this.maturityAge = 100, // Default maturity age
     this.reproductionCooldown = 0,
     this.reproductionChance = 0.01, // Default reproduction chance
-  }) {
-    // Set initial stats based on animal type
-    switch (type) {
-      case AnimalType.rabbit:
-        lifespan = 500; // Shorter lifespan
-        hunger = 80.0; // Starts a bit hungrier
-        thirst = 90.0;
-        energy = 70.0;
-        speed = 2; // Rabbits are faster
-        diet = Diet.herbivore;
-        maturityAge = 50;
-        reproductionChance = 0.05;
-        break;
-      case AnimalType.deer:
-        lifespan = 1500; // Longer lifespan
-        hunger = 100.0;
-        thirst = 100.0;
-        energy = 100.0;
-        speed = 1; // Deer are slower
-        diet = Diet.herbivore;
-        maturityAge = 200;
-        reproductionChance = 0.02;
-        break;
-      case AnimalType.wolf:
-        lifespan = 1200; // Medium lifespan
-        hunger = 100.0;
-        thirst = 100.0;
-        energy = 100.0;
-        speed = 2; // Wolves are fast
-        diet = Diet.carnivore;
-        maturityAge = 150;
-        reproductionChance = 0.01;
-        break;
-    }
-  }
+    Point<int>? previousPosition, // New parameter
+  }) : this.previousPosition = previousPosition ?? position; // Initialize previousPosition
 
   final AnimalType type;
   double hunger;
@@ -81,6 +48,7 @@ class Animal extends Entity {
   int maturityAge;
   int reproductionCooldown;
   double reproductionChance;
+  Point<int> previousPosition; // New field
 
   Animal copyWith({
     Point<int>? position,
@@ -96,6 +64,7 @@ class Animal extends Entity {
     int? maturityAge,
     int? reproductionCooldown,
     double? reproductionChance,
+    Point<int>? previousPosition, // New parameter
   }) {
     return Animal(
       position: position ?? this.position,
@@ -112,6 +81,7 @@ class Animal extends Entity {
       maturityAge: maturityAge ?? this.maturityAge,
       reproductionCooldown: reproductionCooldown ?? this.reproductionCooldown,
       reproductionChance: reproductionChance ?? this.reproductionChance,
+      previousPosition: previousPosition ?? this.previousPosition, // Update previousPosition
     );
   }
 }

@@ -7,6 +7,7 @@ import '../controller/game_controller.dart';
 import '../model/cell.dart';
 import '../model/plant.dart';
 import '../model/animal.dart';
+import '../model/villager.dart'; // Import the Villager class
 import '../model/terrain.dart';
 import 'stats_overlay.dart';
 import 'map_key_overlay.dart';
@@ -29,6 +30,14 @@ class GameScreen extends ConsumerWidget {
       screenHeight / grid.height,
     );
 
+    // Calculate the actual pixel dimensions of the grid
+    final double gridWidthPx = cellSize * grid.width;
+    final double gridHeightPx = cellSize * grid.height;
+
+    // Calculate the offset needed to center the grid within the available space
+    final double gridOffsetX = (screenWidth - gridWidthPx) / 2;
+    final double gridOffsetY = (screenHeight - gridHeightPx) / 2;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Life Simulator'),
@@ -37,8 +46,8 @@ class GameScreen extends ConsumerWidget {
         children: [
           Center(
             child: SizedBox(
-              width: cellSize * grid.width,
-              height: cellSize * grid.height,
+              width: gridWidthPx,
+              height: gridHeightPx,
               child: GridView.builder(
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: grid.width * grid.height,
@@ -67,10 +76,6 @@ class GameScreen extends ConsumerWidget {
                       break;
                   }
 
-                  final animalAtPosition = gameState.animals.firstWhereOrNull(
-                    (animal) => animal.position == Point(x, y),
-                  );
-
                   final plantAtPosition = gameState.plants.firstWhereOrNull(
                     (plant) => plant.position == Point(x, y),
                   );
@@ -78,30 +83,7 @@ class GameScreen extends ConsumerWidget {
                   Widget? childWidget;
                   String tooltipMessage = 'Position: ($x, $y)\nTerrain: ${cell.terrain.name}\nElevation: ${cell.elevation}';
 
-                  if (animalAtPosition != null) {
-                    IconData animalIcon;
-                    Color iconColor;
-                    switch (animalAtPosition.type) {
-                      case AnimalType.rabbit:
-                        animalIcon = Icons.pets; // Example icon for rabbit
-                        iconColor = Colors.grey[700]!;
-                        break;
-                      case AnimalType.deer:
-                        animalIcon = Icons.forest; // Example icon for deer
-                        iconColor = Colors.brown[700]!;
-                        break;
-                      case AnimalType.wolf:
-                        animalIcon = Icons.coronavirus; // Example icon for wolf (can be changed)
-                        iconColor = Colors.blueGrey[900]!;
-                        break;
-                    }
-                    childWidget = Icon(
-                      animalIcon,
-                      color: iconColor,
-                      size: cellSize * 0.8,
-                    );
-                    tooltipMessage += '\nAnimal: ${animalAtPosition.type.name}\nHunger: ${animalAtPosition.hunger.toInt()}\nThirst: ${animalAtPosition.thirst.toInt()}\nEnergy: ${animalAtPosition.energy.toInt()}\nLifespan: ${animalAtPosition.lifespan}\nAge: ${animalAtPosition.age}';
-                  } else if (plantAtPosition != null) {
+                  if (plantAtPosition != null) {
                     Color plantColor;
                     double plantSizeFactor = 0.6;
 
@@ -165,6 +147,93 @@ class GameScreen extends ConsumerWidget {
               ),
             ),
           ),
+          // Render animals on top of the grid
+          ...gameState.animals.map((animal) {
+            IconData animalIcon;
+            Color iconColor;
+            switch (animal.type) {
+              case AnimalType.rabbit:
+                animalIcon = Icons.pets;
+                iconColor = Colors.grey[700]!;
+                break;
+              case AnimalType.deer:
+                animalIcon = Icons.forest;
+                iconColor = Colors.brown[700]!;
+                break;
+              case AnimalType.wolf:
+                animalIcon = Icons.coronavirus;
+                iconColor = Colors.blueGrey[900]!;
+                break;
+            }
+
+            // Calculate the animated position
+            final startX = animal.previousPosition.x.toDouble();
+            final startY = animal.previousPosition.y.toDouble();
+            final endX = animal.position.x.toDouble();
+            final endY = animal.position.y.toDouble();
+
+            return TweenAnimationBuilder<Point<double>>(
+              key: ValueKey(animal.hashCode), // Unique key for each animal to trigger animation
+              tween: PointTween(
+                begin: Point(startX, startY),
+                end: Point(endX, endY),
+              ),
+              duration: const Duration(milliseconds: 400), // Animation duration
+              builder: (context, animatedPosition, child) {
+                return Positioned(
+                  left: gridOffsetX + animatedPosition.x * cellSize,
+                  top: gridOffsetY + animatedPosition.y * cellSize,
+                  width: cellSize,
+                  height: cellSize,
+                  child: Center(
+                    child: Tooltip(
+                      message: 'Animal: ${animal.type.name}\nHunger: ${animal.hunger.toInt()}\nThirst: ${animal.thirst.toInt()}\nEnergy: ${animal.energy.toInt()}\nLifespan: ${animal.lifespan}\nAge: ${animal.age}',
+                      child: Icon(
+                        animalIcon,
+                        color: iconColor,
+                        size: cellSize * 0.8,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          }).toList(),
+          // Render villagers on top of the grid
+          ...gameState.villagers.map((villager) {
+            // Calculate the animated position
+            final startX = villager.previousPosition.x.toDouble();
+            final startY = villager.previousPosition.y.toDouble();
+            final endX = villager.position.x.toDouble();
+            final endY = villager.position.y.toDouble();
+
+            return TweenAnimationBuilder<Point<double>>(
+              key: ValueKey(villager.hashCode), // Unique key for each villager to trigger animation
+              tween: PointTween(
+                begin: Point(startX, startY),
+                end: Point(endX, endY),
+              ),
+              duration: const Duration(milliseconds: 400), // Animation duration
+              builder: (context, animatedPosition, child) {
+                return Positioned(
+                  left: gridOffsetX + animatedPosition.x * cellSize,
+                  top: gridOffsetY + animatedPosition.y * cellSize,
+                  width: cellSize,
+                  height: cellSize,
+                  child: Center(
+                    child: Tooltip(
+                      message: 'Villager: ${villager.name ?? 'Unnamed'}\nProfession: ${villager.profession.name}\nHunger: ${villager.hunger.toInt()}\nThirst: ${villager.thirst.toInt()}\nEnergy: ${villager.energy.toInt()}\nLifespan: ${villager.lifespan}\nAge: ${villager.age}',
+                      child: Icon(
+                        Icons.person, // Generic icon for villagers
+                        color: Colors.purple[400]!, // Distinct color for villagers
+                        size: cellSize * 0.8,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          }).toList(),
           const StatsOverlay(),
           const MapKeyOverlay(),
         ],
@@ -181,5 +250,18 @@ extension FirstWhereOrNullExtension<E> on Iterable<E> {
       }
     }
     return null;
+  }
+}
+
+// Custom Tween for Point<double>
+class PointTween extends Tween<Point<double>> {
+  PointTween({required Point<double> begin, required Point<double> end}) : super(begin: begin, end: end);
+
+  @override
+  Point<double> lerp(double t) {
+    return Point(
+      begin!.x + (end!.x - begin!.x) * t,
+      begin!.y + (end!.y - begin!.y) * t,
+    );
   }
 }

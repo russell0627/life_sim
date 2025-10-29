@@ -37,6 +37,7 @@ class MapKeyOverlay extends StatelessWidget {
               _buildKeyItem(iconData: Icons.pets, iconColor: Colors.grey[700]!, text: 'Rabbit'),
               _buildKeyItem(iconData: Icons.forest, iconColor: Colors.brown[700]!, text: 'Deer'),
               _buildKeyItem(iconData: Icons.coronavirus, iconColor: Colors.blueGrey[900]!, text: 'Wolf'),
+              _buildKeyItem(iconData: Icons.person, iconColor: Colors.purple[400]!, text: 'Villager'), // Added Villager
             ],
           ),
         ),

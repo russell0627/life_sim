@@ -9,6 +9,7 @@ import '../model/game_state.dart';
 import '../model/grid.dart';
 import '../model/plant.dart';
 import '../model/animal.dart';
+import '../model/villager.dart'; // Import the Villager class
 import '../model/cell.dart';
 import '../model/terrain.dart';
 import '../utils/pathfinding.dart';
@@ -23,7 +24,7 @@ class GameController extends _$GameController {
 
   @override
   GameState build() {
-    final initialState = WorldGenerator.generate(width: 50, height: 50, initialPlants: 150, initialAnimals: 30);
+    final initialState = WorldGenerator.generate(width: 50, height: 50, initialPlants: 150, initialAnimals: 30, initialVillagers: 5); // Add initial villagers
     _timer = Timer.periodic(const Duration(milliseconds: 500), (_) => tick());
     ref.onDispose(() => _timer?.cancel());
     return initialState;
@@ -33,6 +34,7 @@ class GameController extends _$GameController {
     var currentGrid = state.grid;
     var currentPlants = List<Plant>.from(state.plants);
     var currentAnimals = List<Animal>.from(state.animals);
+    var currentVillagers = List<Villager>.from(state.villagers); // Get current villagers
     var newTick = state.currentTick + 1;
     var currentSeason = state.currentSeason;
     var seasonTickCounter = state.seasonTickCounter + 1;
@@ -131,91 +133,97 @@ class GameController extends _$GameController {
     List<Plant> nextPlants = List.from(currentPlants); // Corrected: Moved declaration here
 
     for (var animal in currentAnimals) {
+      // Create a mutable copy for this tick's processing
+      Animal processedAnimal = animal.copyWith();
+
       // --- Animal Aging ---
-      animal.age++;
+      processedAnimal.age++;
 
       // --- Animal Reproduction ---
       if (currentSeason == Season.spring && // Animals reproduce in spring
-          animal.age >= animal.maturityAge &&
-          animal.reproductionCooldown <= 0 &&
-          animal.energy > 70 && // Needs to be healthy to reproduce
-          _random.nextDouble() < animal.reproductionChance) {
-        animalsToReproduce.add(animal);
-        animal.reproductionCooldown = 50; // Cooldown before reproducing again
+          processedAnimal.age >= processedAnimal.maturityAge &&
+          processedAnimal.reproductionCooldown <= 0 &&
+          processedAnimal.energy > 70 && // Needs to be healthy to reproduce
+          _random.nextDouble() < processedAnimal.reproductionChance) {
+        animalsToReproduce.add(processedAnimal); // Add the current state for reproduction
+        processedAnimal.reproductionCooldown = 50; // Cooldown before reproducing again
       }
 
       // Decrement reproduction cooldown
-      if (animal.reproductionCooldown > 0) {
-        animal.reproductionCooldown--;
+      if (processedAnimal.reproductionCooldown > 0) {
+        processedAnimal.reproductionCooldown--;
       }
 
       // Deplete needs
-      animal.hunger -= 3.0;
-      animal.thirst -= 1.5;
-      animal.energy -= 0.5;
-      animal.lifespan--;
+      processedAnimal.hunger -= 3.0;
+      processedAnimal.thirst -= 1.5;
+      processedAnimal.energy -= 0.5;
+      processedAnimal.lifespan--;
 
-      animal.hunger = max(0.0, animal.hunger);
-      animal.thirst = max(0.0, animal.thirst);
-      animal.energy = max(0.0, animal.energy);
+      processedAnimal.hunger = max(0.0, processedAnimal.hunger);
+      processedAnimal.thirst = max(0.0, processedAnimal.thirst);
+      processedAnimal.energy = max(0.0, processedAnimal.energy);
 
-      if (animal.hunger <= 0 || animal.thirst <= 0 || animal.lifespan <= 0) {
-        continue;
+      if (processedAnimal.hunger <= 0 || processedAnimal.thirst <= 0 || processedAnimal.lifespan <= 0) {
+        continue; // Animal dies, not added to nextAnimals
       }
 
-      if (animal.isSleeping) {
-        animal.sleepDuration++;
-        animal.energy = min(100.0, animal.energy + 5.0);
-        if (animal.sleepDuration >= 10 || animal.energy >= 90) {
-          animal.isSleeping = false;
-          animal.sleepDuration = 0;
+      if (processedAnimal.isSleeping) {
+        processedAnimal.sleepDuration++;
+        processedAnimal.energy = min(100.0, processedAnimal.energy + 5.0);
+        if (processedAnimal.sleepDuration >= 10 || processedAnimal.energy >= 90) {
+          processedAnimal.isSleeping = false;
+          processedAnimal.sleepDuration = 0;
         }
-        nextAnimals.add(animal.copyWith());
+        nextAnimals.add(processedAnimal.copyWith(previousPosition: processedAnimal.position)); // No movement, so previous is current
         continue;
       }
 
-      Point<int> targetPosition = animal.position;
+      // Capture the position *before* any movement calculations for this tick
+      Point<int> positionBeforeMovement = processedAnimal.position;
+
+      Point<int> targetPositionForStep = processedAnimal.position; // This is the target for a single step
       int stepsTaken = 0;
 
       bool Function(Cell, Point<int>) animalObstaclePredicate = (cell, pos) {
         if (cell.terrain == TerrainType.hill) return true; // All animals avoid hills
-        if (animal.type == AnimalType.rabbit && cell.terrain == TerrainType.water) return true; // Rabbits avoid water
+        if (processedAnimal.type == AnimalType.rabbit && cell.terrain == TerrainType.water) return true; // Rabbits avoid water
         return false;
       };
 
-      while (stepsTaken < animal.speed) {
-        Point<int> currentAnimalPosition = animal.position;
+      while (stepsTaken < processedAnimal.speed) {
+        Point<int> currentAnimalPositionInStep = processedAnimal.position;
         bool actionTaken = false;
 
-        if (animal.thirst < 50) {
+        if (processedAnimal.thirst < 50) {
           final path = Pathfinding.findPath(
             currentGrid,
-            currentAnimalPosition,
+            currentAnimalPositionInStep,
             (cell, pos) => cell.terrain == TerrainType.water,
             animalObstaclePredicate,
           );
           if (path != null && path.length > 1) {
-            targetPosition = path[1];
-          } else if (currentGrid.getCell(currentAnimalPosition).terrain == TerrainType.water) {
-            animal.thirst = 100.0;
+            targetPositionForStep = path[1];
+          } else if (currentGrid.getCell(currentAnimalPositionInStep).terrain == TerrainType.water) {
+            processedAnimal.thirst = 100.0;
             actionTaken = true;
           }
-        } else if (animal.hunger < 50) {
-          if (animal.diet == Diet.herbivore) {
+        } else if (processedAnimal.hunger < 50) {
+          if (processedAnimal.diet == Diet.herbivore) {
             final path = Pathfinding.findPath(
               currentGrid,
-              currentAnimalPosition,
+              currentAnimalPositionInStep,
               (cell, pos) => nextPlants.any((p) => p.position == pos && (p.type == PlantType.grass || (p.type == PlantType.berryBush && !p.isEmpty))), // Only target non-empty berry bushes
               animalObstaclePredicate,
             );
             if (path != null && path.length > 1) {
-              targetPosition = path[1];
+              targetPositionForStep = path[1];
             } else {
               final plantToEat = nextPlants.firstWhereOrNull(
-                (p) => p.position == currentAnimalPosition && (p.type == PlantType.grass || (p.type == PlantType.berryBush && !p.isEmpty)),
+                (p) => p.position == currentAnimalPositionInStep && (p.type == PlantType.grass || (p.type == PlantType.berryBush && !p.isEmpty)),
               );
               if (plantToEat != null) {
-                animal.hunger = min(100.0, animal.hunger + plantToEat.nutritionalValue);
+                processedAnimal.hunger = min(100.0, processedAnimal.hunger + plantToEat.nutritionalValue);
                 actionTaken = true;
 
                 if (plantToEat.type == PlantType.grass) {
@@ -228,37 +236,37 @@ class GameController extends _$GameController {
                 }
               }
             }
-          } else if (animal.diet == Diet.carnivore) {
+          } else if (processedAnimal.diet == Diet.carnivore) {
             final path = Pathfinding.findPath(
               currentGrid,
-              currentAnimalPosition,
+              currentAnimalPositionInStep,
               (cell, pos) => nextAnimals.any((a) => a.position == pos && a.diet == Diet.herbivore),
               animalObstaclePredicate,
             );
             if (path != null && path.length > 1) {
-              targetPosition = path[1];
+              targetPositionForStep = path[1];
             } else {
               final prey = nextAnimals.firstWhereOrNull(
-                (a) => a.position == currentAnimalPosition && a.diet == Diet.herbivore,
+                (a) => a.position == currentAnimalPositionInStep && a.diet == Diet.herbivore,
               );
               if (prey != null) {
-                animal.hunger = min(100.0, animal.hunger + 50.0);
-                nextAnimals.remove(prey);
+                processedAnimal.hunger = min(100.0, processedAnimal.hunger + 50.0);
+                nextAnimals.remove(prey); // Prey is removed from the list of animals for the next tick
                 actionTaken = true;
               }
             }
           }
-        } else if (animal.energy < 30) {
-          animal.isSleeping = true;
-          animal.sleepDuration = 0;
+        } else if (processedAnimal.energy < 30) {
+          processedAnimal.isSleeping = true;
+          processedAnimal.sleepDuration = 0;
           actionTaken = true;
         } else {
           final possibleMoves = <Point<int>>[];
           for (int dx = -1; dx <= 1; dx++) {
             for (int dy = -1; dy <= 1; dy++) {
               if (dx == 0 && dy == 0) continue;
-              final newX = currentAnimalPosition.x + dx;
-              final newY = currentAnimalPosition.y + dy;
+              final newX = currentAnimalPositionInStep.x + dx;
+              final newY = currentAnimalPositionInStep.y + dy;
               final newPosition = Point(newX, newY);
 
               if (newX >= 0 && newX < currentGrid.width &&
@@ -270,19 +278,22 @@ class GameController extends _$GameController {
             }
           }
           if (possibleMoves.isNotEmpty) {
-            targetPosition = possibleMoves[_random.nextInt(possibleMoves.length)];
+            targetPositionForStep = possibleMoves[_random.nextInt(possibleMoves.length)];
           }
         }
 
-        if (!actionTaken && targetPosition != currentAnimalPosition) {
-          animal.position = targetPosition;
+        if (!actionTaken && targetPositionForStep != currentAnimalPositionInStep) {
+          processedAnimal.position = targetPositionForStep; // Update position for the next step in this tick
         }
         stepsTaken++;
         if (actionTaken) break;
       }
-      nextAnimals.add(animal.copyWith());
 
-      nextCellEntities.update(animal.position, (value) => value..add(animal), ifAbsent: () => [animal]);
+      // After all movement steps for this tick are calculated, add the final state to nextAnimals.
+      nextAnimals.add(processedAnimal.copyWith(previousPosition: positionBeforeMovement));
+
+      // Update nextCellEntities with the animal's *final* position for this tick.
+      nextCellEntities.update(processedAnimal.position, (value) => value..add(processedAnimal), ifAbsent: () => [processedAnimal]);
     }
 
     // --- Animal Reproduction ---
@@ -323,11 +334,126 @@ class GameController extends _$GameController {
           diet: parentAnimal.diet, // Inherit diet
           maturityAge: parentAnimal.maturityAge,
           reproductionChance: parentAnimal.reproductionChance,
+          previousPosition: offspringPosition, // Offspring starts at its position
         );
         nextAnimals.add(offspring);
         // Add offspring to nextCellEntities so it's rendered immediately
         nextCellEntities.update(offspringPosition, (value) => value..add(offspring), ifAbsent: () => [offspring]);
       }
+    }
+
+    List<Villager> nextVillagers = [];
+    for (var villager in currentVillagers) {
+      Villager processedVillager = villager.copyWith();
+
+      // --- Villager Aging ---
+      processedVillager.age++;
+
+      // --- Deplete Needs ---
+      processedVillager.hunger -= 1.0; // Slower hunger depletion than animals
+      processedVillager.thirst -= 1.0;
+      processedVillager.energy -= 0.2;
+      processedVillager.lifespan--;
+
+      processedVillager.hunger = max(0.0, processedVillager.hunger);
+      processedVillager.thirst = max(0.0, processedVillager.thirst);
+      processedVillager.energy = max(0.0, processedVillager.energy);
+
+      // --- Death Condition ---
+      if (processedVillager.hunger <= 0 || processedVillager.thirst <= 0 || processedVillager.lifespan <= 0) {
+        continue; // Villager dies
+      }
+
+      // Capture the position *before* any movement calculations for this tick
+      Point<int> positionBeforeMovement = processedVillager.position;
+      Point<int> targetPosition = processedVillager.position;
+      bool actionTaken = false;
+
+      // --- Villager Obstacle Predicate ---
+      bool Function(Cell, Point<int>) villagerObstaclePredicate = (cell, pos) {
+        if (cell.terrain == TerrainType.water || cell.terrain == TerrainType.hill) return true;
+        return false;
+      };
+
+      // --- Priority-Based Actions ---
+      if (processedVillager.isSleeping) {
+        processedVillager.sleepDuration++;
+        processedVillager.energy = min(100.0, processedVillager.energy + 5.0);
+        if (processedVillager.sleepDuration >= 10 || processedVillager.energy >= 90) {
+          processedVillager.isSleeping = false;
+          processedVillager.sleepDuration = 0;
+        }
+        actionTaken = true;
+      } else if (processedVillager.thirst < 50) {
+        final path = Pathfinding.findPath(
+          currentGrid,
+          processedVillager.position,
+          (cell, pos) => cell.terrain == TerrainType.water, // Target water
+          villagerObstaclePredicate,
+        );
+        if (path != null && path.length > 1) {
+          targetPosition = path[1];
+        } else if (currentGrid.getCell(processedVillager.position).terrain == TerrainType.water) {
+          processedVillager.thirst = 100.0; // Drink water
+          actionTaken = true;
+        }
+      } else if (processedVillager.hunger < 50) {
+        final path = Pathfinding.findPath(
+          currentGrid,
+          processedVillager.position,
+          (cell, pos) => nextPlants.any((p) => p.position == pos && (p.type == PlantType.berryBush && !p.isEmpty)), // Target non-empty berry bushes
+          villagerObstaclePredicate,
+        );
+        if (path != null && path.length > 1) {
+          targetPosition = path[1];
+        } else {
+          final plantToEat = nextPlants.firstWhereOrNull(
+            (p) => p.position == processedVillager.position && (p.type == PlantType.berryBush && !p.isEmpty),
+          );
+          if (plantToEat != null) {
+            processedVillager.hunger = min(100.0, processedVillager.hunger + plantToEat.nutritionalValue);
+            plantToEat.isEmpty = true;
+            plantToEat.regrowthTimer = 20; // 20 ticks to regrow berries
+            plantToEat.nutritionalValue = 0.0; // No nutrition while empty
+            actionTaken = true;
+          }
+        }
+      } else if (processedVillager.energy < 30) {
+        processedVillager.isSleeping = true;
+        processedVillager.sleepDuration = 0;
+        actionTaken = true;
+      } else {
+        // Random movement if no critical needs
+        final possibleMoves = <Point<int>>[];
+        for (int dx = -1; dx <= 1; dx++) {
+          for (int dy = -1; dy <= 1; dy++) {
+            if (dx == 0 && dy == 0) continue;
+            final newX = processedVillager.position.x + dx;
+            final newY = processedVillager.position.y + dy;
+            final newPosition = Point(newX, newY);
+
+            if (newX >= 0 && newX < currentGrid.width &&
+                newY >= 0 && newY < currentGrid.height) {
+              final targetCell = currentGrid.getCell(newPosition);
+              if (!villagerObstaclePredicate(targetCell, newPosition)) {
+                possibleMoves.add(newPosition);
+              }
+            }
+          }
+        }
+        if (possibleMoves.isNotEmpty) {
+          targetPosition = possibleMoves[_random.nextInt(possibleMoves.length)];
+        }
+      }
+
+      if (!actionTaken && targetPosition != processedVillager.position) {
+        processedVillager.position = targetPosition;
+      }
+
+      nextVillagers.add(processedVillager.copyWith(previousPosition: positionBeforeMovement));
+
+      // Update nextCellEntities with the villager's *final* position for this tick.
+      nextCellEntities.update(processedVillager.position, (value) => value..add(processedVillager), ifAbsent: () => [processedVillager]);
     }
 
     Grid newGrid = Grid(width: currentGrid.width, height: currentGrid.height);
@@ -340,16 +466,22 @@ class GameController extends _$GameController {
         List<Entity> finalEntitiesForCell = [];
         Animal? animalInCell;
         Plant? plantInCell;
+        Villager? villagerInCell; // New: Check for villager in cell
 
         for (var entity in entitiesInCell) {
           if (entity is Animal) {
             animalInCell = entity;
           } else if (entity is Plant) {
             plantInCell = entity;
+          } else if (entity is Villager) { // New: Assign villager if found
+            villagerInCell = entity;
           }
         }
 
-        if (animalInCell != null) {
+        // Prioritize rendering order: Villager > Animal > Plant
+        if (villagerInCell != null) {
+          finalEntitiesForCell.add(villagerInCell);
+        } else if (animalInCell != null) {
           finalEntitiesForCell.add(animalInCell);
           if (originalCell.terrain == TerrainType.grassland || originalCell.terrain == TerrainType.forest) {
             if (plantInCell != null) {
@@ -371,6 +503,6 @@ class GameController extends _$GameController {
       }
     }
 
-    state = state.copyWith(grid: newGrid, plants: nextPlants, animals: nextAnimals, currentTick: newTick, currentSeason: currentSeason, seasonTickCounter: seasonTickCounter);
+    state = state.copyWith(grid: newGrid, plants: nextPlants, animals: nextAnimals, villagers: nextVillagers, currentTick: newTick, currentSeason: currentSeason, seasonTickCounter: seasonTickCounter);
   }
 }

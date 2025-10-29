@@ -7,6 +7,7 @@ import '../model/game_state.dart';
 import '../model/grid.dart';
 import '../model/plant.dart';
 import '../model/terrain.dart';
+import '../model/villager.dart'; // Import the Villager class
 
 class WorldGenerator {
   static final Random _random = Random();
@@ -40,10 +41,12 @@ class WorldGenerator {
     required int height,
     int initialPlants = 10,
     int initialAnimals = 5,
+    int initialVillagers = 0, // New parameter for initial villagers
   }) {
     Grid grid = Grid(width: width, height: height);
     List<Plant> plants = [];
     List<Animal> animals = [];
+    List<Villager> villagers = []; // New list for villagers
 
     int noiseSeed = _random.nextInt(100000);
 
@@ -53,8 +56,8 @@ class WorldGenerator {
 
     for (int x = 0; x < width; x++) {
       for (int y = 0; y < height; y++) {
-        double scaledX = x / width * 6.0;
-        double scaledY = y / height * 6.0;
+        double scaledX = x / width * 2.0; // Lowered from 6.0 to make terrain smoother
+        double scaledY = y / height * 2.0; // Lowered from 6.0 to make terrain smoother
         noiseMap[x][y] = _noise(scaledX, scaledY, noiseSeed, 4, 0.5);
 
         if (noiseMap[x][y] < minNoise) minNoise = noiseMap[x][y];
@@ -67,7 +70,7 @@ class WorldGenerator {
         final position = Point(x, y);
         double normalizedNoise = (noiseMap[x][y] - minNoise) / (maxNoise - minNoise);
 
-        int elevation = (normalizedNoise * 4).round().clamp(0, 4);
+        int elevation = (normalizedNoise * 2).round().clamp(0, 2); // Reduced elevation levels
         TerrainType terrain;
 
         if (normalizedNoise < 0.1) {
@@ -105,7 +108,7 @@ class WorldGenerator {
       do {
         position = Point(_random.nextInt(width), _random.nextInt(height));
       } while (grid.getCell(position).terrain == TerrainType.water ||
-               grid.getCell(position).terrain == TerrainType.hill || // Renamed from mountain to hill
+               grid.getCell(position).terrain == TerrainType.hill ||
                (plantType == PlantType.tree && grid.getCell(position).terrain != TerrainType.forest) ||
                plants.any((p) => p.position == position));
       plants.add(Plant(position: position, type: plantType));
@@ -118,16 +121,31 @@ class WorldGenerator {
       do {
         position = Point(_random.nextInt(width), _random.nextInt(height));
       } while (grid.getCell(position).terrain == TerrainType.water ||
-               grid.getCell(position).terrain == TerrainType.hill || // Renamed from mountain to hill
+               grid.getCell(position).terrain == TerrainType.hill ||
                plants.any((p) => p.position == position) ||
                animals.any((a) => a.position == position));
       animals.add(Animal(position: position, type: animalType));
+    }
+
+    // Place initial villagers
+    for (int i = 0; i < initialVillagers; i++) {
+      Point<int> position;
+      VillagerProfession profession = VillagerProfession.values[_random.nextInt(VillagerProfession.values.length)];
+      do {
+        position = Point(_random.nextInt(width), _random.nextInt(height));
+      } while (grid.getCell(position).terrain == TerrainType.water ||
+               grid.getCell(position).terrain == TerrainType.hill ||
+               plants.any((p) => p.position == position) ||
+               animals.any((a) => a.position == position) ||
+               villagers.any((v) => v.position == position));
+      villagers.add(Villager(position: position, profession: profession));
     }
 
     return GameState(
       grid: grid,
       plants: plants,
       animals: animals,
+      villagers: villagers, // Pass villagers to GameState
       currentTick: 0,
       currentSeason: Season.spring,
       seasonTickCounter: 0,
