@@ -6,6 +6,7 @@ import 'package:life_sim/src/model/entity.dart';
 enum PlantType {
   grass,
   berryBush,
+  tree,
   // Add more plant types here
 }
 
@@ -27,6 +28,10 @@ class Plant extends Entity {
       case PlantType.berryBush:
         size = 2.0; // Berry bushes start larger
         nutritionalValue = 25.0; // More nutritious
+        break;
+      case PlantType.tree:
+        size = 5.0; // Trees start large
+        nutritionalValue = 0.0; // Trees are not directly edible (for now)
         break;
     }
   }

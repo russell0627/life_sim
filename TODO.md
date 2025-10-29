@@ -31,7 +31,7 @@ This plan outlines the development steps with a focus on the code structure, inc
 - [x] **`Plant` Model:**
     - [x] Create a `Plant` class in `lib/src/model/plant.dart` that extends `Entity`.
     - [x] Add properties for `size` or `growthStage` and `nutritionalValue`.
-    - [x] Implement support for multiple plant types (`PlantType` enum).
+    - [x] Implement support for multiple plant types (`PlantType` enum, including `tree`).
     - [x] Implement `isEmpty` and `regrowthTimer` for berry bushes.
     - [x] In the `GameController`'s `tick()` method, add logic for plant growth and spreading to adjacent empty `Cell`s.
 
@@ -41,6 +41,7 @@ This plan outlines the development steps with a focus on the code structure, inc
     - [x] Add a `lifespan` property.
     - [x] Implement support for multiple animal types (`AnimalType` enum and `diet` property, including `wolf` carnivore).
     - [x] Add `speed` attribute to animals.
+    - [x] Add `age`, `maturityAge`, `reproductionCooldown`, `reproductionChance` for reproduction.
     - [x] In the `GameController`'s `tick()` method, add logic to deplete these needs over time.
 
 ## Phase 3: AI and Behavior in `GameController`
@@ -62,6 +63,7 @@ This plan outlines the development steps with a focus on the code structure, inc
     - [x] Eating a plant or animal should remove it from the grid.
     - [x] Grass should regress in growth stage when eaten.
     - [x] Berry bushes should become empty for a duration when eaten.
+    - [x] Implement animal aging and reproduction.
 
 - [x] **Life and Death:**
     - [x] In the `tick()` method, check for animals whose `hunger` or `thirst` has reached 0, or who have exceeded their `lifespan`. 
@@ -74,7 +76,8 @@ This plan outlines the development steps with a focus on the code structure, inc
     - [x] This service will have a method that creates and returns an initial `GameState` with procedurally placed terrain, plants, and animals (including different types).
     - [x] The `GameController` will call this service to get its initial state.
     - [x] Implement elevation generation for the grid (now with smoother hills).
-    - [x] Implement generation of diverse terrain types based on elevation.
+    - [x] Implement generation of diverse terrain types based on elevation (now with larger, more connected grasslands and water bodies).
+    - [x] Initialize `currentSeason` and `seasonTickCounter`.
 
 - [x] **UI (View):**
     - [x] Create a `GameScreen` widget in `lib/src/view/game_screen.dart`.
@@ -85,9 +88,13 @@ This plan outlines the development steps with a focus on the code structure, inc
     - [x] Visually represent diverse terrain types on the grid.
     - [x] Add a map key (legend) to the UI.
     - [x] Visually represent empty berry bushes and regressed grass.
+    - [x] Visually represent the new `Tree` plant type.
+    - [x] Display current season in `StatsOverlay`.
+    - [x] Implement tooltips for cells and entities.
+    - [x] Grass icon size increased.
 
 ## Phase 5: Finalization
 
 - [x] **Testing:** Write unit and widget tests for the core logic and UI components.
-- [ ] **Balancing:** Adjust simulation parameters (need depletion, growth rates, etc.) for an interesting and sustainable ecosystem.
+- [x] **Balancing:** Adjust simulation parameters (initial plants/animals, grass growth/spread, animal hunger, etc.) for an interesting and sustainable ecosystem.
 - [ ] **Refinement:** Add simple animations or visual effects for entity actions (e.g., movement, eating). Code cleanup and documentation.

@@ -1,5 +1,8 @@
 
 import 'package:flutter/material.dart';
+import 'package:life_sim/src/model/animal.dart';
+import 'package:life_sim/src/model/plant.dart';
+import 'package:life_sim/src/model/terrain.dart';
 
 class MapKeyOverlay extends StatelessWidget {
   const MapKeyOverlay({super.key});
@@ -22,17 +25,18 @@ class MapKeyOverlay extends StatelessWidget {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const Divider(),
-              _buildKeyItem(Colors.blue[200]!, 'Water', isCircle: false),
-              _buildKeyItem(Colors.lightGreen[300]!, 'Grassland', isCircle: false),
-              _buildKeyItem(Colors.green[300]!, 'Forest', isCircle: false),
-              _buildKeyItem(Colors.grey[600]!, 'Mountain', isCircle: false),
+              _buildKeyItem(color: Colors.blue[200]!, text: 'Water', isCircle: false),
+              _buildKeyItem(color: Colors.lightGreen[300]!, text: 'Grassland', isCircle: false),
+              _buildKeyItem(color: Colors.green[300]!, text: 'Forest', isCircle: false),
+              _buildKeyItem(color: Colors.brown[300]!, text: 'Hill', isCircle: false), // Updated hill color
               const Divider(),
-              _buildKeyItem(Colors.lightGreen, 'Grass', isCircle: true),
-              _buildKeyItem(Colors.green[800]!, 'Berry Bush', isCircle: true, hasInnerCircle: true, innerCircleColor: Colors.red),
+              _buildKeyItem(color: Colors.yellow, text: 'Grass', isCircle: true),
+              _buildKeyItem(color: Colors.green[800]!, text: 'Berry Bush', isCircle: true, hasInnerCircle: true, innerCircleColor: Colors.red),
+              _buildKeyItem(color: Colors.brown, text: 'Tree', isCircle: false),
               const Divider(),
-              _buildKeyItem(Colors.orange[700]!, 'Rabbit', isCircle: false),
-              _buildKeyItem(Colors.red[900]!, 'Deer', isCircle: false),
-              _buildKeyItem(Colors.grey[800]!, 'Wolf', isCircle: false),
+              _buildKeyItem(iconData: Icons.pets, iconColor: Colors.grey[700]!, text: 'Rabbit'),
+              _buildKeyItem(iconData: Icons.forest, iconColor: Colors.brown[700]!, text: 'Deer'),
+              _buildKeyItem(iconData: Icons.coronavirus, iconColor: Colors.blueGrey[900]!, text: 'Wolf'),
             ],
           ),
         ),
@@ -40,34 +44,44 @@ class MapKeyOverlay extends StatelessWidget {
     );
   }
 
-  Widget _buildKeyItem(Color color, String text, {bool isCircle = false, bool hasInnerCircle = false, Color? innerCircleColor}) {
+  Widget _buildKeyItem({Color? color, String? text, bool isCircle = false, bool hasInnerCircle = false, Color? innerCircleColor, IconData? iconData, Color? iconColor}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.0),
       child: Row(
         children: [
-          Container(
+          SizedBox(
             width: 16,
             height: 16,
-            decoration: BoxDecoration(
-              color: color,
-              shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
-              border: Border.all(color: Colors.black26, width: 0.5),
-            ),
-            child: hasInnerCircle
-                ? Center(
-                    child: Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: innerCircleColor,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
+            child: iconData != null
+                ? Icon(
+                    iconData,
+                    color: iconColor,
+                    size: 16,
                   )
-                : null,
+                : Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
+                      border: Border.all(color: Colors.black26, width: 0.5),
+                    ),
+                    child: hasInnerCircle
+                        ? Center(
+                            child: Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: innerCircleColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
           ),
           const SizedBox(width: 8),
-          Text(text),
+          Text(text ?? ''),
         ],
       ),
     );

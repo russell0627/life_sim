@@ -27,7 +27,11 @@ class Animal extends Entity {
     this.isSleeping = false,
     this.sleepDuration = 0,
     this.diet = Diet.herbivore, // Default to herbivore for now
-    this.speed = 1, // Default speed
+    this.speed = 1,
+    this.age = 0,
+    this.maturityAge = 100, // Default maturity age
+    this.reproductionCooldown = 0,
+    this.reproductionChance = 0.01, // Default reproduction chance
   }) {
     // Set initial stats based on animal type
     switch (type) {
@@ -38,6 +42,8 @@ class Animal extends Entity {
         energy = 70.0;
         speed = 2; // Rabbits are faster
         diet = Diet.herbivore;
+        maturityAge = 50;
+        reproductionChance = 0.05;
         break;
       case AnimalType.deer:
         lifespan = 1500; // Longer lifespan
@@ -46,6 +52,8 @@ class Animal extends Entity {
         energy = 100.0;
         speed = 1; // Deer are slower
         diet = Diet.herbivore;
+        maturityAge = 200;
+        reproductionChance = 0.02;
         break;
       case AnimalType.wolf:
         lifespan = 1200; // Medium lifespan
@@ -54,6 +62,8 @@ class Animal extends Entity {
         energy = 100.0;
         speed = 2; // Wolves are fast
         diet = Diet.carnivore;
+        maturityAge = 150;
+        reproductionChance = 0.01;
         break;
     }
   }
@@ -67,6 +77,10 @@ class Animal extends Entity {
   int sleepDuration;
   Diet diet;
   int speed;
+  int age;
+  int maturityAge;
+  int reproductionCooldown;
+  double reproductionChance;
 
   Animal copyWith({
     Point<int>? position,
@@ -78,6 +92,10 @@ class Animal extends Entity {
     int? sleepDuration,
     Diet? diet,
     int? speed,
+    int? age,
+    int? maturityAge,
+    int? reproductionCooldown,
+    double? reproductionChance,
   }) {
     return Animal(
       position: position ?? this.position,
@@ -90,6 +108,10 @@ class Animal extends Entity {
       sleepDuration: sleepDuration ?? this.sleepDuration,
       diet: diet ?? this.diet,
       speed: speed ?? this.speed,
+      age: age ?? this.age,
+      maturityAge: maturityAge ?? this.maturityAge,
+      reproductionCooldown: reproductionCooldown ?? this.reproductionCooldown,
+      reproductionChance: reproductionChance ?? this.reproductionChance,
     );
   }
 }

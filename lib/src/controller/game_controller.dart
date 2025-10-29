@@ -23,7 +23,7 @@ class GameController extends _$GameController {
 
   @override
   GameState build() {
-    final initialState = WorldGenerator.generate(width: 20, height: 20, initialPlants: 50, initialAnimals: 5);
+    final initialState = WorldGenerator.generate(width: 50, height: 50, initialPlants: 150, initialAnimals: 30);
     _timer = Timer.periodic(const Duration(milliseconds: 500), (_) => tick());
     ref.onDispose(() => _timer?.cancel());
     return initialState;
@@ -34,6 +34,16 @@ class GameController extends _$GameController {
     var currentPlants = List<Plant>.from(state.plants);
     var currentAnimals = List<Animal>.from(state.animals);
     var newTick = state.currentTick + 1;
+    var currentSeason = state.currentSeason;
+    var seasonTickCounter = state.seasonTickCounter + 1;
+
+    // --- Season Progression ---
+    const int ticksPerSeason = 100; // Example: 100 ticks per season
+    if (seasonTickCounter >= ticksPerSeason) {
+      seasonTickCounter = 0;
+      currentSeason = Season.values[(currentSeason.index + 1) % Season.values.length];
+      // Apply season-specific effects here (e.g., plant die-off in winter)
+    }
 
     // --- Entity Collection for Grid Update ---
     Map<Point<int>, List<Entity>> nextCellEntities = {};
@@ -54,54 +64,57 @@ class GameController extends _$GameController {
         }
       }
 
-      // Plant grows (only if not empty for berry bush)
-      if (!(plant.type == PlantType.berryBush && plant.isEmpty)) {
+      // Plant grows (only if not empty for berry bush and not winter)
+      if (currentSeason != Season.winter && !(plant.type == PlantType.berryBush && plant.isEmpty)) {
         if (plant.type == PlantType.grass) {
           plant.size += 0.2; // Grass grows faster
           plant.nutritionalValue += 0.5; // Grass becomes more nutritious faster
         } else if (plant.type == PlantType.berryBush) {
           plant.size += 0.01; // Berry bushes grow very slowly
           plant.nutritionalValue += 0.05; // Berry bushes become more nutritious very slowly
-        } else {
-          plant.size += 0.05;
-          plant.nutritionalValue += 0.2;
+        } else if (plant.type == PlantType.tree) {
+          plant.size += 0.005; // Trees grow very slowly
         }
       }
       updatedPlants.add(plant.copyWith()); // Add copy to updated list
 
-      // Plant spreads
-      double spreadChance = 0.005; // Default spread chance
-      if (plant.type == PlantType.grass) {
-        spreadChance = 0.1; // Grass spreads much faster (10% chance per tick)
-      } else if (plant.type == PlantType.berryBush) {
-        spreadChance = 0.001; // Berry bushes spread very slowly
-      }
+      // Plant spreads (only if not winter)
+      if (currentSeason != Season.winter) {
+        double spreadChance = 0.005; // Default spread chance
+        if (plant.type == PlantType.grass) {
+          spreadChance = 0.4; // Grass spreads much faster (40% chance per tick)
+        } else if (plant.type == PlantType.berryBush) {
+          spreadChance = 0.001; // Berry bushes spread very slowly
+        } else if (plant.type == PlantType.tree) {
+          spreadChance = 0.0005; // Trees spread very, very slowly
+        }
 
-      if (_random.nextDouble() < spreadChance) {
-        final adjacentPositions = <Point<int>>[];
-        for (int dx = -1; dx <= 1; dx++) {
-          for (int dy = -1; dy <= 1; dy++) {
-            if (dx == 0 && dy == 0) continue;
-            final newX = plant.position.x + dx;
-            final newY = plant.position.y + dy;
-            final newPosition = Point(newX, newY);
+        if (_random.nextDouble() < spreadChance) {
+          final adjacentPositions = <Point<int>>[];
+          for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+              if (dx == 0 && dy == 0) continue;
+              final newX = plant.position.x + dx;
+              final newY = plant.position.y + dy;
+              final newPosition = Point(newX, newY);
 
-            if (newX >= 0 && newX < currentGrid.width &&
-                newY >= 0 && newY < currentGrid.height) {
-              final targetCell = currentGrid.getCell(newPosition);
-              // Plants can only spread to grassland or forest
-              if ((targetCell.terrain == TerrainType.grassland || targetCell.terrain == TerrainType.forest) &&
-                  !currentPlants.any((p) => p.position == newPosition)) { // No plant-on-plant overlap
-                adjacentPositions.add(newPosition);
+              if (newX >= 0 && newX < currentGrid.width &&
+                  newY >= 0 && newY < currentGrid.height) {
+                final targetCell = currentGrid.getCell(newPosition);
+                // Plants can only spread to grassland or forest
+                if ((targetCell.terrain == TerrainType.grassland || targetCell.terrain == TerrainType.forest) &&
+                    !currentPlants.any((p) => p.position == newPosition)) { // No plant-on-plant overlap
+                  adjacentPositions.add(newPosition);
+                }
               }
             }
           }
-        }
 
-        if (adjacentPositions.isNotEmpty) {
-          final spreadPosition = adjacentPositions[_random.nextInt(adjacentPositions.length)];
-          final newPlant = Plant(position: spreadPosition, type: plant.type); // Spread the same type of plant
-          plantsToAdd.add(newPlant);
+          if (adjacentPositions.isNotEmpty) {
+            final spreadPosition = adjacentPositions[_random.nextInt(adjacentPositions.length)];
+            final newPlant = Plant(position: spreadPosition, type: plant.type); // Spread the same type of plant
+            plantsToAdd.add(newPlant);
+          }
         }
       }
     }
@@ -114,10 +127,30 @@ class GameController extends _$GameController {
     }
 
     List<Animal> nextAnimals = [];
-    List<Plant> nextPlants = List.from(currentPlants); // Copy for animal consumption
+    List<Animal> animalsToReproduce = [];
+    List<Plant> nextPlants = List.from(currentPlants); // Corrected: Moved declaration here
 
     for (var animal in currentAnimals) {
-      animal.hunger -= 2.0;
+      // --- Animal Aging ---
+      animal.age++;
+
+      // --- Animal Reproduction ---
+      if (currentSeason == Season.spring && // Animals reproduce in spring
+          animal.age >= animal.maturityAge &&
+          animal.reproductionCooldown <= 0 &&
+          animal.energy > 70 && // Needs to be healthy to reproduce
+          _random.nextDouble() < animal.reproductionChance) {
+        animalsToReproduce.add(animal);
+        animal.reproductionCooldown = 50; // Cooldown before reproducing again
+      }
+
+      // Decrement reproduction cooldown
+      if (animal.reproductionCooldown > 0) {
+        animal.reproductionCooldown--;
+      }
+
+      // Deplete needs
+      animal.hunger -= 3.0;
       animal.thirst -= 1.5;
       animal.energy -= 0.5;
       animal.lifespan--;
@@ -144,14 +177,11 @@ class GameController extends _$GameController {
       Point<int> targetPosition = animal.position;
       int stepsTaken = 0;
 
-      // Define a dynamic obstacle predicate for the current animal
-      bool animalObstaclePredicate(Cell cell, Point<int> pos) {
-        // Pathfinding already handles elevation difference
-        if (cell.terrain == TerrainType.mountain) return true; // All animals avoid mountains
+      bool Function(Cell, Point<int>) animalObstaclePredicate = (cell, pos) {
+        if (cell.terrain == TerrainType.hill) return true; // All animals avoid hills
         if (animal.type == AnimalType.rabbit && cell.terrain == TerrainType.water) return true; // Rabbits avoid water
-        // Add other animal-specific terrain restrictions here
         return false;
-      }
+      };
 
       while (stepsTaken < animal.speed) {
         Point<int> currentAnimalPosition = animal.position;
@@ -181,7 +211,6 @@ class GameController extends _$GameController {
             if (path != null && path.length > 1) {
               targetPosition = path[1];
             } else {
-              // If already on a plant, eat it
               final plantToEat = nextPlants.firstWhereOrNull(
                 (p) => p.position == currentAnimalPosition && (p.type == PlantType.grass || (p.type == PlantType.berryBush && !p.isEmpty)),
               );
@@ -234,7 +263,6 @@ class GameController extends _$GameController {
 
               if (newX >= 0 && newX < currentGrid.width &&
                   newY >= 0 && newY < currentGrid.height) {
-                // Use the dynamic obstacle predicate for wandering
                 if (!animalObstaclePredicate(currentGrid.getCell(newPosition), newPosition)) {
                   possibleMoves.add(newPosition);
                 }
@@ -255,6 +283,51 @@ class GameController extends _$GameController {
       nextAnimals.add(animal.copyWith());
 
       nextCellEntities.update(animal.position, (value) => value..add(animal), ifAbsent: () => [animal]);
+    }
+
+    // --- Animal Reproduction ---
+    for (var parentAnimal in animalsToReproduce) {
+      // Find a suitable empty adjacent cell for the offspring
+      final adjacentEmptyCells = <Point<int>>[];
+      for (int dx = -1; dx <= 1; dx++) {
+        for (int dy = -1; dy <= 1; dy++) {
+          if (dx == 0 && dy == 0) continue;
+          final newX = parentAnimal.position.x + dx;
+          final newY = parentAnimal.position.y + dy;
+          final newPosition = Point(newX, newY);
+
+          if (newX >= 0 && newX < currentGrid.width &&
+              newY >= 0 && newY < currentGrid.height) {
+            // Check if cell is not water/hill and not occupied by another animal
+            final targetCell = currentGrid.getCell(newPosition);
+            if (targetCell.terrain != TerrainType.water &&
+                targetCell.terrain != TerrainType.hill &&
+                !nextAnimals.any((a) => a.position == newPosition)) {
+              adjacentEmptyCells.add(newPosition);
+            }
+          }
+        }
+      }
+
+      if (adjacentEmptyCells.isNotEmpty) {
+        final offspringPosition = adjacentEmptyCells[_random.nextInt(adjacentEmptyCells.length)];
+        final offspring = Animal(
+          position: offspringPosition,
+          type: parentAnimal.type,
+          age: 0, // Newborn
+          hunger: 80.0, // Start a bit hungry
+          thirst: 80.0,
+          energy: 80.0,
+          lifespan: parentAnimal.lifespan, // Inherit lifespan potential
+          speed: parentAnimal.speed, // Inherit speed
+          diet: parentAnimal.diet, // Inherit diet
+          maturityAge: parentAnimal.maturityAge,
+          reproductionChance: parentAnimal.reproductionChance,
+        );
+        nextAnimals.add(offspring);
+        // Add offspring to nextCellEntities so it's rendered immediately
+        nextCellEntities.update(offspringPosition, (value) => value..add(offspring), ifAbsent: () => [offspring]);
+      }
     }
 
     Grid newGrid = Grid(width: currentGrid.width, height: currentGrid.height);
@@ -298,6 +371,6 @@ class GameController extends _$GameController {
       }
     }
 
-    state = state.copyWith(grid: newGrid, plants: nextPlants, animals: nextAnimals, currentTick: newTick);
+    state = state.copyWith(grid: newGrid, plants: nextPlants, animals: nextAnimals, currentTick: newTick, currentSeason: currentSeason, seasonTickCounter: seasonTickCounter);
   }
 }

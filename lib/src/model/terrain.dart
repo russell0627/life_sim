@@ -3,5 +3,12 @@ enum TerrainType {
   water,
   grassland,
   forest,
-  mountain,
+  hill,
+}
+
+enum Season {
+  spring,
+  summer,
+  autumn,
+  winter,
 }

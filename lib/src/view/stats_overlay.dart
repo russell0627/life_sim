@@ -27,6 +27,10 @@ class StatsOverlay extends ConsumerWidget {
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               Text(
+                'Season: ${gameState.currentSeason.name.toUpperCase()}',
+                style: const TextStyle(fontSize: 16),
+              ),
+              Text(
                 'Animals: ${gameState.animals.length}',
                 style: const TextStyle(fontSize: 16),
               ),

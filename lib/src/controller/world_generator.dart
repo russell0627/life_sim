@@ -2,69 +2,85 @@
 import 'dart:math';
 
 import '../model/animal.dart';
+import '../model/cell.dart';
 import '../model/game_state.dart';
 import '../model/grid.dart';
 import '../model/plant.dart';
 import '../model/terrain.dart';
 
 class WorldGenerator {
+  static final Random _random = Random();
+
+  static double _noise(double x, double y, int seed, int octaves, double persistence) {
+    double total = 0;
+    double frequency = 1;
+    double amplitude = 1;
+    double maxValue = 0; // Used for normalizing result to 0.0 - 1.0
+
+    for (int i = 0; i < octaves; i++) {
+      double value = _pseudoRandom(x * frequency, y * frequency, seed).toDouble();
+      total += value * amplitude;
+
+      maxValue += amplitude;
+      amplitude *= persistence;
+      frequency *= 2;
+    }
+
+    return total / maxValue; // Normalize to 0-1
+  }
+
+  static int _pseudoRandom(double x, double y, int seed) {
+    int n = (x * 10000).toInt() + (y * 10000).toInt() * 10000 + seed;
+    n = (n << 13) ^ n;
+    return (n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff;
+  }
+
   static GameState generate({
     required int width,
     required int height,
     int initialPlants = 10,
     int initialAnimals = 5,
   }) {
-    final Random random = Random();
     Grid grid = Grid(width: width, height: height);
     List<Plant> plants = [];
     List<Animal> animals = [];
 
-    // Step 1: Generate initial random elevations
-    List<List<int>> elevations = List.generate(width, (_) => List.generate(height, (_) => random.nextInt(5))); // Elevation from 0 to 4
+    int noiseSeed = _random.nextInt(100000);
 
-    // Step 2: Apply a smoothing pass to create hills
-    // This is a simple average with neighbors, repeated a few times
-    for (int s = 0; s < 3; s++) { // 3 smoothing passes
-      List<List<int>> newElevations = List.generate(width, (_) => List.generate(height, (_) => 0));
-      for (int x = 0; x < width; x++) {
-        for (int y = 0; y < height; y++) {
-          int sumElevation = elevations[x][y];
-          int count = 1;
-          for (int dx = -1; dx <= 1; dx++) {
-            for (int dy = -1; dy <= 1; dy++) {
-              if (dx == 0 && dy == 0) continue;
-              int nx = x + dx;
-              int ny = y + dy;
-              if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                sumElevation += elevations[nx][ny];
-                count++;
-              }
-            }
-          }
-          newElevations[x][y] = (sumElevation / count).round().clamp(0, 4); // Keep elevation within bounds
-        }
+    List<List<double>> noiseMap = List.generate(width, (_) => List.generate(height, (_) => 0.0));
+    double minNoise = 1.0;
+    double maxNoise = 0.0;
+
+    for (int x = 0; x < width; x++) {
+      for (int y = 0; y < height; y++) {
+        double scaledX = x / width * 6.0;
+        double scaledY = y / height * 6.0;
+        noiseMap[x][y] = _noise(scaledX, scaledY, noiseSeed, 4, 0.5);
+
+        if (noiseMap[x][y] < minNoise) minNoise = noiseMap[x][y];
+        if (noiseMap[x][y] > maxNoise) maxNoise = noiseMap[x][y];
       }
-      elevations = newElevations;
     }
 
-    // Step 3: Assign TerrainType based on smoothed elevation
     for (int x = 0; x < width; x++) {
       for (int y = 0; y < height; y++) {
         final position = Point(x, y);
-        int elevation = elevations[x][y];
+        double normalizedNoise = (noiseMap[x][y] - minNoise) / (maxNoise - minNoise);
+
+        int elevation = (normalizedNoise * 4).round().clamp(0, 4);
         TerrainType terrain;
 
-        if (elevation == 0 && random.nextDouble() < 0.4) { // Higher chance for water at lowest elevation
+        if (normalizedNoise < 0.1) {
           terrain = TerrainType.water;
-        } else if (elevation >= 3) { // Mountains at higher elevations
-          terrain = TerrainType.mountain;
-        } else if (elevation >= 1 && random.nextDouble() < 0.4) { // Forests at mid-elevations
-          terrain = TerrainType.forest;
-        } else {
+          elevation = 0;
+        } else if (normalizedNoise < 0.75) {
           terrain = TerrainType.grassland;
+        } else if (normalizedNoise < 0.9) {
+          terrain = TerrainType.forest;
+        } else { 
+          terrain = TerrainType.hill; // Renamed from mountain to hill
         }
 
-        // Ensure water is always elevation 0
         if (terrain == TerrainType.water) {
           elevation = 0;
         }
@@ -76,11 +92,21 @@ class WorldGenerator {
     // Place initial plants
     for (int i = 0; i < initialPlants; i++) {
       Point<int> position;
-      PlantType plantType = PlantType.values[random.nextInt(PlantType.values.length)];
+      PlantType plantType;
+      double plantTypeRoll = _random.nextDouble();
+      if (plantTypeRoll < 0.6) {
+        plantType = PlantType.grass;
+      } else if (plantTypeRoll < 0.9) {
+        plantType = PlantType.berryBush;
+      } else {
+        plantType = PlantType.tree;
+      }
+
       do {
-        position = Point(random.nextInt(width), random.nextInt(height));
+        position = Point(_random.nextInt(width), _random.nextInt(height));
       } while (grid.getCell(position).terrain == TerrainType.water ||
-               grid.getCell(position).terrain == TerrainType.mountain ||
+               grid.getCell(position).terrain == TerrainType.hill || // Renamed from mountain to hill
+               (plantType == PlantType.tree && grid.getCell(position).terrain != TerrainType.forest) ||
                plants.any((p) => p.position == position));
       plants.add(Plant(position: position, type: plantType));
     }
@@ -88,16 +114,23 @@ class WorldGenerator {
     // Place initial animals
     for (int i = 0; i < initialAnimals; i++) {
       Point<int> position;
-      AnimalType animalType = AnimalType.values[random.nextInt(AnimalType.values.length)];
+      AnimalType animalType = AnimalType.values[_random.nextInt(AnimalType.values.length)];
       do {
-        position = Point(random.nextInt(width), random.nextInt(height));
+        position = Point(_random.nextInt(width), _random.nextInt(height));
       } while (grid.getCell(position).terrain == TerrainType.water ||
-               grid.getCell(position).terrain == TerrainType.mountain ||
+               grid.getCell(position).terrain == TerrainType.hill || // Renamed from mountain to hill
                plants.any((p) => p.position == position) ||
                animals.any((a) => a.position == position));
       animals.add(Animal(position: position, type: animalType));
     }
 
-    return GameState(grid: grid, plants: plants, animals: animals, currentTick: 0);
+    return GameState(
+      grid: grid,
+      plants: plants,
+      animals: animals,
+      currentTick: 0,
+      currentSeason: Season.spring,
+      seasonTickCounter: 0,
+    );
   }
 }
